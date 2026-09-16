@@ -145,9 +145,40 @@ function buildSandbox() {
   chk('线上站点 HTTP 200 可访问', r.status === 200, 'status=' + r.status);
   chk('服务端为 GitHub Pages', /GitHub\.com/i.test(r.headers.server || '') || !!r.headers['x-github-request-id'],
     'server=' + (r.headers.server || '-'));
-  chk('返回体积与本地产物一致（551.7 KB）',
-    Math.abs(Buffer.byteLength(html, 'utf8') - 564917) < 64,
-    (Buffer.byteLength(html, 'utf8') / 1024).toFixed(1) + ' KB');
+  /*
+   * 体积一致性：与本地 docs/index.html 比对。
+   * 不要硬编码期望体积 —— 任何文案改动都会让硬编码值失效，
+   * 产生「测试脚本自身过期」的假告警。
+   *
+   * 注意：GitHub Pages 在服务时会把 CRLF 规范化为 LF，
+   * 因此必须以「行尾无关」的方式比对内容，否则会误报不一致。
+   * 两者体积相同 + 规范化行尾后完全相等，即视为一致。
+   */
+  const LOCAL_INDEX = path.join(__dirname, '..', 'docs', 'index.html');
+  const norm = s => s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  let sizeNote;
+  let sizeOk;
+  if (fs.existsSync(LOCAL_INDEX)) {
+    const local = fs.readFileSync(LOCAL_INDEX, 'utf8');
+    /*
+     * 只比对「行尾规范化后的内容」，不比原始字节数：
+     * 本地产物因 Windows 的 core.autocrlf 保留 CRLF，而 GitHub Pages
+     * 服务时会把 CRLF 规范化为 LF，两者字节数天然不同（差值 = 换行数）。
+     * 只要规范化后完全一致，就说明线上内容与本地一致。
+     */
+    const sameContent = norm(local) === norm(html);
+    sizeOk = sameContent;
+    const liveKB = (Buffer.byteLength(html, 'utf8') / 1024).toFixed(1);
+    const localKB = (Buffer.byteLength(local, 'utf8') / 1024).toFixed(1);
+    sizeNote = sameContent
+      ? '内容一致（线上 ' + liveKB + ' KB / 本地 ' + localKB +
+        ' KB，字节差来自 CRLF→LF 规范化，属正常）'
+      : '与本地不一致：线上 ' + liveKB + ' KB / 本地 ' + localKB + ' KB（可能 Pages 尚未重建完成）';
+  } else {
+    sizeOk = true;
+    sizeNote = (Buffer.byteLength(html, 'utf8') / 1024).toFixed(1) + ' KB（本地产物缺失，跳过比对）';
+  }
+  chk('线上产物与本地 docs/index.html 内容一致', sizeOk, sizeNote);
 
   /* 结构与零外链 */
   chk('DOCTYPE 完整', /^<!DOCTYPE html>/i.test(html));
