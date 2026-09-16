@@ -136,6 +136,10 @@ data = {
         "platform": "苏果智选 Suguo AI Assortment Intelligence",
         "store": "华润苏果（南京江宁黄金海岸广场店）",
         "generatedAt": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        # 三重声明：原型性质 / 参赛用途 / 数据来源。三者缺一不可，
+        # 避免被误读为已上线的商业系统或真实企业经营数据。
+        "nature": "软件原型 Prototype（参赛作品）",
+        "purpose": "用于参加比赛，展示 AI 选品辅助决策的技术构想；未接入任何企业生产系统，未做商业部署。",
         "disclaimer": "本平台全部经营数据为基于公开行业数据构造的模拟演示数据，不代表华润苏果或任何企业真实经营数据。",
         "files": {},
     },

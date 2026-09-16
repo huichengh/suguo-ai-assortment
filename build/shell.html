@@ -448,6 +448,18 @@ table.tbl .mut{color:var(--ink-4)}
 .lg-l h1{margin:0 0 4px;font-size:25px;color:#fff;font-weight:700;letter-spacing:-.3px}
 .lg-l .en{font-size:11.5px;color:#6fa592;letter-spacing:1.6px;text-transform:uppercase;margin-bottom:22px}
 .lg-l .desc{font-size:13px;line-height:1.85;color:#a9c8bb}
+/*
+ * 登录页「参赛原型」声明块：用暖色边框从深绿背景中跳出来，
+ * 保证评委/访客在进入系统前第一眼就能看到项目性质与数据来源。
+ */
+.lg-l .proto-note{
+  display:flex;gap:9px;align-items:flex-start;
+  background:rgba(255,196,84,.10);border:1px solid rgba(255,196,84,.38);
+  border-radius:9px;padding:11px 13px;margin-bottom:18px;
+  font-size:11.5px;line-height:1.72;color:#e8dcc0;
+}
+.lg-l .proto-note svg{color:#ffc454;flex:0 0 15px;margin-top:2px}
+.lg-l .proto-note strong{color:#ffd98a;font-weight:700}
 .lg-l .feats{margin-top:auto;padding-top:24px;display:flex;flex-direction:column;gap:11px}
 .lg-l .ft{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#bcd6cb}
 .lg-l .ft svg{width:16px;height:16px;flex:0 0 16px;color:#4ecf9a}
@@ -527,6 +539,15 @@ table.tbl .mut{color:var(--ink-4)}
     <div class="lg-l">
       <h1>苏果智选</h1>
       <div class="en">Suguo AI Assortment Intelligence</div>
+      <div class="proto-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/></svg>
+        <div>
+          <strong>参赛原型作品（Prototype）</strong>
+          本平台为参加比赛而开发的软件原型，用于展示 AI 选品辅助决策的技术构想，
+          未接入任何企业生产系统、未做商业部署。全部经营数据为基于公开行业数据构造的
+          <strong>模拟演示数据</strong>，不代表华润苏果或任何企业真实经营数据。
+        </div>
+      </div>
       <div class="desc">
         AI 社区商超智能选品与品类优化平台。<br>
         面向社区商超采购人员、品类经理与门店店长，
@@ -610,7 +631,7 @@ table.tbl .mut{color:var(--ink-4)}
           <span id="crumbTop">AI经营驾驶舱</span>
         </div>
         <div class="spacer"></div>
-        <span class="demo-chip" title="本平台全部经营数据为模拟演示数据">模拟演示数据</span>
+        <span class="demo-chip" title="本平台为参赛原型作品，全部经营数据为模拟演示数据，不代表任何企业真实经营数据">参赛原型 · 模拟数据</span>
         <button class="top-btn" id="topBackup" title="导出 / 导入数据备份">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
           <span>备份</span>
