@@ -99,7 +99,7 @@ python -m http.server 8899
 
 ### 方式三：在线访问
 
-直接打开 **https://huichengh.github.io/suguo-ai-assortment/**，无需安装任何东西。
+直接打开 **https://huichengh.github.io/suguo-ai-assortment/** ，无需安装任何东西。
 
 ### 演示账号
 
