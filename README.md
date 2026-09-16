@@ -5,6 +5,12 @@
 
 演示场景：华润苏果南京江宁黄金海岸广场店。
 
+### 🔗 在线演示
+
+**https://huichengh.github.io/suguo-ai-assortment/**
+
+> 由 GitHub Pages 托管，多设备可直接打开。演示账号见下方「快速开始」。
+
 ---
 
 ## ⚠️ 数据声明（请先阅读）
@@ -44,9 +50,9 @@
 ### 方式一：直接打开（零依赖）
 
 ```bash
-git clone https://github.com/loyalghost/suguo-ai-assortment.git
+git clone https://github.com/huichengh/suguo-ai-assortment.git
 cd suguo-ai-assortment
-# 直接双击打开 dist/index.html 即可
+# 直接双击打开 docs/index.html 即可
 ```
 
 产物是**单文件 HTML，全部 CSS / JS / SVG 图标 / SVG 图表均已内联，零外部依赖，可完全离线运行**。
@@ -54,10 +60,14 @@ cd suguo-ai-assortment
 ### 方式二：本地起服务
 
 ```bash
-cd dist
+cd docs
 python -m http.server 8899
 # 浏览器打开 http://127.0.0.1:8899/
 ```
+
+### 方式三：在线访问
+
+直接打开 **https://huichengh.github.io/suguo-ai-assortment/**，无需安装任何东西。
 
 ### 演示账号
 
@@ -98,12 +108,16 @@ suguo-ai-assortment/
 │   ├── bundle.js                 打包为单文件 HTML
 │   ├── test_algos.js             算法单元测试（38 项）
 │   ├── smoke.js                  源文件冒烟自检（48 项）
-│   └── verify_dist.js            交付产物验证（25 项）
+│   └── verify_dist.js            交付产物验证（26 项）
 │
-└── dist/
-    ├── index.html                单文件交付产物（可直接打开）
+└── docs/                         GitHub Pages 发布目录
+    ├── index.html                单文件交付产物（ASCII 名，在线访问用）
     └── 苏果智选-*.html            同内容，中文名便于本地识别
 ```
+
+> **为什么产物放在 `docs/`**：GitHub Pages 的 branch 模式只允许发布根目录 `/` 或 `/docs`，
+> 不支持自定义目录。放在 `docs/` 可让 Pages 直接生效，无需依赖 GitHub Actions 与额外的
+> `workflow` 权限。
 
 ---
 
@@ -115,10 +129,10 @@ suguo-ai-assortment/
 node build/test_algos.js      # 算法单元测试 —— 38 项
 node build/smoke.js           # 源文件冒烟自检 —— 48 项
 node build/bundle.js          # 打包单文件 + 产物自检 —— 8 项
-node build/verify_dist.js     # 交付产物验证 —— 25 项
+node build/verify_dist.js     # 交付产物验证 —— 26 项
 ```
 
-四层验证全部通过后才视为可交付。`verify_dist.js` 会直接从 `dist` 产物中抽出内联脚本整体执行，
+四层验证全部通过后才视为可交付。`verify_dist.js` 会直接从 `docs` 产物中抽出内联脚本整体执行，
 验证的是**用户真正拿到的那一个文件**，而非源文件拼装。
 
 ---

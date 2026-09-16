@@ -13,9 +13,9 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
-/* 优先验证 ASCII 命名的 index.html —— 静态托管与 GitHub Pages 实际提供的正是它 */
-const DIST_EN = path.join(ROOT, 'dist', 'index.html');
-const DIST_CN = path.join(ROOT, 'dist', '苏果智选-AI社区商超智能选品与品类优化平台.html');
+/* 优先验证 ASCII 命名的 index.html —— GitHub Pages 实际提供的正是它 */
+const DIST_EN = path.join(ROOT, 'docs', 'index.html');
+const DIST_CN = path.join(ROOT, 'docs', '苏果智选-AI社区商超智能选品与品类优化平台.html');
 const DIST = fs.existsSync(DIST_EN) ? DIST_EN : DIST_CN;
 
 const out = [];

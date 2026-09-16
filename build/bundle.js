@@ -13,7 +13,13 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const BUILD = __dirname;
-const OUT_DIR = path.join(ROOT, 'dist');
+/*
+ * 产物目录命名为 docs/ 而非 dist/：
+ * GitHub Pages 的 branch 模式只允许发布根目录 `/` 或 `/docs`，
+ * 不支持自定义目录。用 docs/ 可以让 Pages 无需 Actions 即可直接上线，
+ * 免去额外的 workflow 权限依赖。
+ */
+const OUT_DIR = path.join(ROOT, 'docs');
 /*
  * 双命名输出：
  *   - index.html —— ASCII 文件名，URL 安全，供 GitHub Pages / 静态托管直接访问
