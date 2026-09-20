@@ -221,6 +221,12 @@ function check(name, cond, detail) {
     const iss = q.issues.filter(i => i.field === '历史销量(件)')[0];
     return fcast === 20 && !!iss && iss.count === fcast;
   })());
+  check('附加9e 日期检查接受 ISO 周格式「2026-W01」，不误判为无效格式', (() => {
+    const q = Algo.runQualityCheck('demand_history',
+      Algo.rowsForDataset('dataset_demand_forecast.csv', global.SUGUO_DATA),
+      'dataset_demand_forecast.csv');
+    return !q.issues.some(i => /无法识别的格式/.test(i.desc)) && q.dims.validity === 100;
+  })());
 }
 
 console.log('\n===== 苏果智选 核心算法单元测试 =====\n');

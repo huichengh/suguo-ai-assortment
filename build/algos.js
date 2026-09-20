@@ -966,12 +966,13 @@
       var dvals = rows.map(function (r) { return String(r[spec.date] || '').trim(); }).filter(Boolean);
       if (dvals.length) {
         var sorted = dvals.slice().sort();
-        var invalid = dvals.filter(function (v) { return !/^\d{4}(-\d{2}(-\d{2})?|W\d{2})?$/.test(v); }).length;
+        // 接受 年 / 年-月 / 年-月-日 / ISO 周「2026-W01」/ 简写周「2026W01」
+        var invalid = dvals.filter(function (v) { return !/^\d{4}(-\d{2}-\d{2}|-\d{2}|-W\d{2}|W\d{2})?$/.test(v); }).length;
         if (invalid > 0) {
           issues.push({
             dim: '有效性', severity: 'medium', field: spec.date, count: invalid,
             desc: '日期字段「' + spec.date + '」存在 ' + invalid + ' 个无法识别的格式',
-            suggestion: '建议统一为 YYYY-MM 或 YYYY-MM-DD 格式',
+            suggestion: '建议统一为 YYYY-MM、YYYY-MM-DD 或 ISO 周格式 YYYY-Www',
           });
         }
         issues.push({

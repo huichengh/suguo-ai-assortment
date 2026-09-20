@@ -1103,12 +1103,16 @@ def run_quality_check(dataset_type: str, rows: list[dict]) -> dict[str, Any]:
         dvals = [str(r.get(date_col) or "").strip() for r in rows]
         dvals = [v for v in dvals if v]
         if dvals:
-            invalid = sum(1 for v in dvals if not re.match(r"^\d{4}(-\d{2}(-\d{2})?|W\d{2})?$", v))
+            # 接受 年 / 年-月 / 年-月-日 / ISO 周「2026-W01」/ 简写周「2026W01」
+            invalid = sum(
+                1 for v in dvals
+                if not re.match(r"^\d{4}(-\d{2}-\d{2}|-\d{2}|-W\d{2}|W\d{2})?$", v)
+            )
             if invalid:
                 issues.append({
                     "dim": "有效性", "severity": "medium", "field": date_col, "count": invalid,
                     "desc": f"日期字段「{date_col}」存在 {invalid} 个无法识别的格式",
-                    "suggestion": "建议统一为 YYYY-MM 或 YYYY-MM-DD 格式",
+                    "suggestion": "建议统一为 YYYY-MM、YYYY-MM-DD 或 ISO 周格式 YYYY-Www",
                 })
             s = sorted(dvals)
             issues.append({
