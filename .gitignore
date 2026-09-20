@@ -55,6 +55,13 @@ frontend/.env.local
 *.pem
 *.key
 
+# ---- 后台本地数据库 ----
+# server/suguo.db 为本地演示库：首次启动会自动建表并灌入种子数据，
+# 因此无需纳入版本控制，避免二进制文件反复产生无意义差异。
+server/*.db
+server/*.sqlite
+server/*.sqlite3
+
 # ---- 构建临时产物 ----
 # bundle 的中间输出（每次由 bundle.js 重新生成）
 build/_*.tmp

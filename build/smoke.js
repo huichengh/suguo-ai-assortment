@@ -117,7 +117,7 @@ global.localStorage = {
 global.Blob.prototype = {};
 
 /* ---------------- 载入脚本 ---------------- */
-const FILES = ['data.js', 'algos.js', 'app-core.js', 'app-charts.js', 'app-pages.js', 'app-modules.js', 'app-ai.js'];
+const FILES = ['data.js', 'algos.js', 'app-core.js', 'app-charts.js', 'app-pages.js', 'app-modules.js', 'app-ai.js', 'app-api.js'];
 const vm = require('vm');
 const ctx = vm.createContext(global);
 

@@ -38,6 +38,12 @@ const SCRIPTS = [
   'app-pages.js',
   'app-modules.js',
   'app-ai.js',
+  /*
+   * app-api.js 为后台 API 适配层，必须放最后：
+   * 它需要覆写 App.getAssoc，故须在 app-core.js 定义 App 之后执行。
+   * 默认保持离线（内联数据），仅在用户主动连接后台或存在历史连接配置时才接管数据源。
+   */
+  'app-api.js',
 ];
 
 function read(p) {

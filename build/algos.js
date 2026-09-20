@@ -842,11 +842,27 @@
     // 1. 字段映射与必填字段检查
     var missingCols = spec.required.filter(function (c) { return headers.indexOf(c) < 0; });
     if (missingCols.length) {
-      issues.push({
-        dim: '一致性', severity: 'high', field: missingCols.join('、'), count: missingCols.length,
-        desc: '缺少必需字段：' + missingCols.join('、'),
-        suggestion: '请补全字段后重新上传，或调整列名与模板一致',
-      });
+      // 必需字段缺失时该文件无法用于其声明的用途。按「可信优先」原则直接拒答，
+      // 不输出五维评分与等级 —— 否则会出现「一个必填字段都没有、却评 90+ 分」的
+      // 误导性结论，与平台自身的可信性原则冲突（详见报告 4.4.5 节）。
+      return {
+        ok: false, insufficient: true, type: type, label: spec.label,
+        fileName: fileName || (type + '.csv'),
+        rowCount: rows.length, colCount: headers.length, headers: headers,
+        missingColumns: missingCols,
+        issues: [{
+          dim: '一致性', severity: 'high', field: missingCols.join('、'), count: missingCols.length,
+          desc: '缺少必需字段：' + missingCols.join('、'),
+          suggestion: '请补全字段后重新上传，或调整列名与模板一致',
+        }],
+        reason: '缺少必需字段：' + missingCols.join('、') + '。「' + spec.label +
+          '」需要这些字段才能完成质量评估，当前文件有 ' + headers.length + ' 列、' +
+          rows.length + ' 行，但列名与模板不符，故不给出评分。请从数据中心下载模板核对列名后重新上传。',
+        checks: ['字段映射', '字段类型检查', '空值检查', '重复值检查', '异常值检查', '日期范围检查', '主键检查', '数值范围检查', '时效性评估'],
+        algorithm: 'DataQualityCheck v1.0',
+        createdAt: new Date().toISOString(),
+        note: '平台仅诊断问题并给出建议，不会静默修改任何原始数据。',
+      };
     }
 
     // 2. 空值检查
@@ -999,6 +1015,68 @@
     };
   }
 
+  /* ==================== 数据集行装配（供质量检查使用） ==================== */
+
+  /**
+   * 把内置数据集（内部规范化结构）还原为「CSV 原始表头」形状的行。
+   *
+   * 质量检查器消费的是上传 CSV 的原始列名，而内置数据用短键存放，
+   * 两者形状不同，必须显式映射 —— 否则会因「缺少必需字段」而无法评估。
+   * 交易明细（22022 行）不在此映射，由上传路径按抽样检查。
+   */
+  function rowsForDataset(fileName, D) {
+    D = D || (typeof window !== 'undefined' ? window.SUGUO_DATA : null) || global.SUGUO_DATA || {};
+    // 销售明细里只存品类编码，需按主数据补出品类名称，否则「品类名称」会整列为空
+    var catName = {};
+    (D.categories || []).forEach(function (c) { catName[c.id] = c.name; });
+    if (fileName === 'dataset_category_sales.csv') {
+      return (D.sales || []).map(function (r) {
+        return {
+          '品类ID': r.cid, '品类名称': catName[r.cid] || '', '月份': r.month, '销量(件)': r.qty,
+          '销售额(元)': r.amt, '毛利额(元)': r.gp, '库存周转天数': r.turnoverDays,
+          '坪效(元/㎡/月)': r.spaceEff, '缺货次数': r.stockout, 'SKU数量': r.skuCount,
+        };
+      });
+    }
+    if (fileName === 'dataset_association_rules.csv') {
+      return (D.rulesAttachment || []).map(function (r) {
+        return {
+          '规则ID': r.id, '前项商品(A)': r.a, '后项商品(B)': r.b,
+          '支持度': r.support, '置信度': r.confidence, '提升度': r.lift,
+          '陈列建议': r.advice,
+        };
+      });
+    }
+    if (fileName === 'dataset_category_health.csv') {
+      return (D.healthAttachment || []).map(function (r) {
+        return {
+          '品类ID': r.cid, '品类名称': r.name, '综合评分': r.score,
+          '健康度等级': r.stars, '评级': r.grade,
+          '销量贡献(%)': r.qtyShare, '毛利贡献(%)': r.gpShare,
+          '周转天数': r.turnoverDays, '坪效得分': r.spaceScore,
+          '优化建议': r.advice, '预警灯': r.lamp,
+        };
+      });
+    }
+    if (fileName === 'dataset_demand_forecast.csv') {
+      var out = [];
+      (D.forecast || []).forEach(function (f) {
+        f.points.forEach(function (p) {
+          out.push({
+            '品类': f.cat, '周次': p.w, '日期': p.date,
+            '历史销量(件)': p.hist == null ? '' : p.hist,
+            '预测销量(件)': p.fc == null ? '' : p.fc,
+            '预测下界(件)': p.lo == null ? '' : p.lo,
+            '预测上界(件)': p.hi == null ? '' : p.hi,
+            '数据类型': p.type,
+          });
+        });
+      });
+      return out;
+    }
+    return null;   // 交易明细 22022 行，改由上传路径按抽样检查
+  }
+
   /* ==================== 导出 ==================== */
 
   var API = {
@@ -1015,6 +1093,7 @@
     buildAssortmentPlan: buildAssortmentPlan,
     buildDashboard: buildDashboard,
     runQualityCheck: runQualityCheck,
+    rowsForDataset: rowsForDataset,
     trendLevelOf: trendLevelOf,
     QUALITY_CHECKERS: QUALITY_CHECKERS,
     computeTrend: computeTrend,

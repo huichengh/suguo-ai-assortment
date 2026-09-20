@@ -53,9 +53,17 @@ function check(name, cond, detail) {
 // 缺失字段是否触发错误提示
 {
   const q = Algo.runQualityCheck('category_sales', [{ 品类ID: 'C001', 月份: '2026-01' }], 'bad.csv');
-  check('T3 缺字段触发高严重度问题', q.ok && q.issues.some(i => i.severity === 'high' && i.dim === '一致性'),
+  check('T3 缺必需字段直接拒答（不给出评分）',
+    q.ok === false && q.insufficient === true
+    && Array.isArray(q.missingColumns) && q.missingColumns.length > 0,
     JSON.stringify(q.missingColumns));
-  check('T3b 缺字段导致一致性维度扣分', q.dims.consistency < 100, `consistency=${q.dims.consistency}`);
+  check('T3b 拒答时不输出评分/等级/五维，避免缺字段却评高分',
+    !('overall' in q) && !('grade' in q) && !('dims' in q));
+  check('T3b2 拒答仍列出高严重度问题，且计数与缺失字段数一致',
+    q.issues.some(i => i.severity === 'high' && i.dim === '一致性')
+    && q.issues[0].count === q.missingColumns.length);
+  check('T3b3 拒答理由说明缺失字段与列数行数',
+    /缺少必需字段/.test(q.reason) && /列/.test(q.reason) && /行/.test(q.reason));
   const empty = Algo.runQualityCheck('category_sales', [], 'empty.csv');
   check('T3c 空文件返回数据不足而非假结果', empty.insufficient === true);
   const cmp = Algo.compare(['C001'], {});
@@ -168,9 +176,50 @@ function check(name, cond, detail) {
   check('附加6 星级分级与分数区间一致',
     Algo.starsOf(90).stars === '★★★★★' && Algo.starsOf(45).stars === '★★☆☆☆'
     && Algo.starsOf(20).stars === '★☆☆☆☆');
-  check('附加7 质量检查五维齐全', (() => {
-    const q = Algo.runQualityCheck('association_rules', global.SUGUO_DATA.rulesAttachment, 'r.csv');
-    return ['completeness', 'consistency', 'validity', 'uniqueness', 'timeliness'].every(k => k in q.dims);
+  check('附加7 质量检查五维齐全（须传 CSV 表头形状的行）', (() => {
+    const csvRows = global.SUGUO_DATA.rulesAttachment.map(r => ({
+      '规则ID': r.id, '前项商品(A)': r.a, '后项商品(B)': r.b,
+      '支持度': r.support, '置信度': r.confidence, '提升度': r.lift,
+    }));
+    const q = Algo.runQualityCheck('association_rules', csvRows, 'r.csv');
+    return q.ok === true && q.missingColumns.length === 0
+      && ['completeness', 'consistency', 'validity', 'uniqueness', 'timeliness'].every(k => k in q.dims);
+  })());
+  check('附加8 内部结构（短键）不得直接喂给质检器，须先映射为 CSV 表头', (() => {
+    const raw = Algo.runQualityCheck('association_rules', global.SUGUO_DATA.rulesAttachment, 'r.csv');
+    return raw.ok === false && raw.insufficient === true && raw.missingColumns.length > 0;
+  })());
+}
+
+// ---------------------------------------------------------------- 附加 9
+// 内置数据集 → CSV 表头形状：四类数据集都必须能正常出分（回归锁定）
+{
+  const pairs = [
+    ['dataset_category_sales.csv', 'category_sales', 84],
+    ['dataset_association_rules.csv', 'association_rules', 20],
+    ['dataset_category_health.csv', 'category_health', 7],
+    ['dataset_demand_forecast.csv', 'demand_history', 80],
+  ];
+  pairs.forEach(([file, type, rows]) => {
+    const shaped = Algo.rowsForDataset(file, global.SUGUO_DATA);
+    const q = Algo.runQualityCheck(type, shaped, file);
+    check(`附加9 内置数据集 ${file} 映射后可正常质检（${rows} 行）`,
+      !!shaped && shaped.length === rows && q.ok === true
+      && q.missingColumns.length === 0
+      && !q.issues.some(i => i.severity === 'high' && i.dim === '一致性'),
+      q.ok ? `overall=${q.overall} 问题=${q.issues.length}` : String(q.reason).slice(0, 70));
+  });
+  check('附加9b 交易明细不参与内置映射（改由上传路径抽样检查）',
+    Algo.rowsForDataset('dataset_transactions_sample.csv', global.SUGUO_DATA) === null);
+  check('附加9c 销售明细映射后「品类名称」不留空（须按主数据补名）',
+    Algo.rowsForDataset('dataset_category_sales.csv', global.SUGUO_DATA)
+      .every(r => r['品类名称'] && r['品类名称'].length > 0));
+  check('附加9d 需求历史的空值来自预测行的结构性留空，非数据缺陷', (() => {
+    const rows = Algo.rowsForDataset('dataset_demand_forecast.csv', global.SUGUO_DATA);
+    const fcast = rows.filter(r => r['数据类型'] === '预测数据').length;
+    const q = Algo.runQualityCheck('demand_history', rows, 'dataset_demand_forecast.csv');
+    const iss = q.issues.filter(i => i.field === '历史销量(件)')[0];
+    return fcast === 20 && !!iss && iss.count === fcast;
   })());
 }
 

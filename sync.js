@@ -187,9 +187,13 @@ if (big.length) {
 log('✓ 无超大文件');
 
 /* 安全检查：不应提交的敏感/临时文件 */
-const suspicious = allFiles.filter(f =>
-  /(^|\/)(\.env|.*\.pem|.*\.key|.*\.db|.*\.sqlite3?)$/i.test(f) ||
-  /^_/.test(path.basename(f)) || /\.log$/.test(f));
+const suspicious = allFiles.filter(f => {
+  const base = path.basename(f);
+  // Python 包的 __init__.py 是必需文件，不能按「_ 开头」误判为临时文件
+  if (/^__.*__\.(py|pyi)$/.test(base)) return false;
+  return /(^|\/)(\.env|.*\.pem|.*\.key|.*\.db|.*\.sqlite3?)$/i.test(f) ||
+    /^_/.test(base) || /\.log$/.test(f);
+});
 if (suspicious.length) {
   fail('敏感/临时文件检查',
     '以下文件疑似不应提交：\n' + suspicious.join('\n') +

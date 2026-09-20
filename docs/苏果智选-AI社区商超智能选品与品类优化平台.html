@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   苏果智选 · 单文件构建产物
-  构建时间：2026/9/16 22:46:07
+  构建时间：2026/9/20 23:41:47
   构建方式：node build/bundle.js（源文件见 build/ 目录）
   数据说明：内置数据集为「基于公开行业数据构造的模拟数据」，非苏果真实经营数据。
 -->
@@ -534,6 +534,59 @@ table.tbl .mut{color:var(--ink-4)}
   .nav,.topbar,.disclaimer-bar,.btn,.page-head .acts{display:none!important}
   .main{margin-left:0}
   .content{padding:0}
+  .api-overlay{display:none!important}
+}
+/* ---------- 后台 API 适配层：连接面板 ---------- */
+.api-overlay{
+  position:fixed;inset:0;z-index:400;background:rgba(17,24,39,.42);
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:48px 16px;overflow:auto;
+}
+.api-panel{
+  width:100%;max-width:720px;background:#fff;border:1px solid var(--line);
+  border-radius:14px;padding:20px 22px 18px;box-shadow:0 12px 40px rgba(15,23,42,.18);
+  font-size:13px;color:var(--ink);
+}
+.api-title{font-size:15px;font-weight:700;margin-bottom:10px}
+.api-status{
+  border-radius:9px;padding:9px 12px;margin-bottom:14px;font-size:12.5px;
+  background:var(--brand-bg);border:1px solid var(--line);color:var(--ink-2);
+}
+.api-status.ok{border-color:rgba(14,107,74,.35);color:var(--brand)}
+.api-status.err{
+  border-color:rgba(201,58,46,.35);color:#c93a2e;background:rgba(201,58,46,.06);
+}
+.api-form{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-bottom:14px}
+.api-form label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--ink-2)}
+.api-form label:first-child{grid-column:1/-1}
+.api-form input{
+  height:36px;border:1px solid var(--line);border-radius:8px;padding:0 11px;
+  font-size:16px;font-family:inherit;color:var(--ink);background:#fff;
+}
+.api-form input:focus{outline:none;border-color:var(--brand)}
+.api-actions{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:16px}
+.api-btn{
+  height:36px;padding:0 15px;border-radius:8px;border:1px solid var(--line);
+  background:#fff;color:var(--ink-2);font-size:12.5px;font-weight:600;
+  font-family:inherit;cursor:pointer;transition:border-color .15s,color .15s;
+}
+.api-btn:hover{border-color:var(--brand);color:var(--brand)}
+.api-btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.api-btn.primary:hover{color:#fff;opacity:.92}
+.api-btn.ghost{border-style:dashed}
+.api-btn:disabled{opacity:.5;cursor:not-allowed}
+.api-section{border-top:1px solid var(--line);padding-top:13px;margin-bottom:10px}
+.api-h{font-size:12.5px;font-weight:700;margin-bottom:9px;color:var(--ink)}
+.api-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:9px}
+.api-table th,.api-table td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:left}
+.api-table th{color:var(--ink-2);font-weight:600;background:var(--brand-bg)}
+.api-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.api-ok{color:var(--brand);font-weight:600;font-size:12.5px}
+.api-warn{color:#c93a2e;font-weight:600;font-size:12.5px}
+.api-note{font-size:11.5px;line-height:1.7;color:var(--ink-2);margin:0}
+@media (max-width:640px){
+  .api-form{grid-template-columns:1fr}
+  .api-overlay{padding:20px 12px}
 }
 </style>
 </head>
@@ -638,6 +691,10 @@ table.tbl .mut{color:var(--ink-4)}
         </div>
         <div class="spacer"></div>
         <span class="demo-chip" title="本平台为参赛原型作品，全部经营数据为模拟演示数据，不代表任何企业真实经营数据">参赛原型 · 模拟数据</span>
+        <button class="top-btn" id="topApi" title="连接 FastAPI 后台，将数据源从内联数据集切换为后台接口">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="2" y="3" width="20" height="6" rx="2"/><rect x="2" y="15" width="20" height="6" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
+          <span>后台</span>
+        </button>
         <button class="top-btn" id="topBackup" title="导出 / 导入数据备份">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
           <span>备份</span>
@@ -1534,11 +1591,27 @@ window.SUGUO_DATA = {"meta":{"platform":"苏果智选 Suguo AI Assortment Intell
     // 1. 字段映射与必填字段检查
     var missingCols = spec.required.filter(function (c) { return headers.indexOf(c) < 0; });
     if (missingCols.length) {
-      issues.push({
-        dim: '一致性', severity: 'high', field: missingCols.join('、'), count: missingCols.length,
-        desc: '缺少必需字段：' + missingCols.join('、'),
-        suggestion: '请补全字段后重新上传，或调整列名与模板一致',
-      });
+      // 必需字段缺失时该文件无法用于其声明的用途。按「可信优先」原则直接拒答，
+      // 不输出五维评分与等级 —— 否则会出现「一个必填字段都没有、却评 90+ 分」的
+      // 误导性结论，与平台自身的可信性原则冲突（详见报告 4.4.5 节）。
+      return {
+        ok: false, insufficient: true, type: type, label: spec.label,
+        fileName: fileName || (type + '.csv'),
+        rowCount: rows.length, colCount: headers.length, headers: headers,
+        missingColumns: missingCols,
+        issues: [{
+          dim: '一致性', severity: 'high', field: missingCols.join('、'), count: missingCols.length,
+          desc: '缺少必需字段：' + missingCols.join('、'),
+          suggestion: '请补全字段后重新上传，或调整列名与模板一致',
+        }],
+        reason: '缺少必需字段：' + missingCols.join('、') + '。「' + spec.label +
+          '」需要这些字段才能完成质量评估，当前文件有 ' + headers.length + ' 列、' +
+          rows.length + ' 行，但列名与模板不符，故不给出评分。请从数据中心下载模板核对列名后重新上传。',
+        checks: ['字段映射', '字段类型检查', '空值检查', '重复值检查', '异常值检查', '日期范围检查', '主键检查', '数值范围检查', '时效性评估'],
+        algorithm: 'DataQualityCheck v1.0',
+        createdAt: new Date().toISOString(),
+        note: '平台仅诊断问题并给出建议，不会静默修改任何原始数据。',
+      };
     }
 
     // 2. 空值检查
@@ -1691,6 +1764,68 @@ window.SUGUO_DATA = {"meta":{"platform":"苏果智选 Suguo AI Assortment Intell
     };
   }
 
+  /* ==================== 数据集行装配（供质量检查使用） ==================== */
+
+  /**
+   * 把内置数据集（内部规范化结构）还原为「CSV 原始表头」形状的行。
+   *
+   * 质量检查器消费的是上传 CSV 的原始列名，而内置数据用短键存放，
+   * 两者形状不同，必须显式映射 —— 否则会因「缺少必需字段」而无法评估。
+   * 交易明细（22022 行）不在此映射，由上传路径按抽样检查。
+   */
+  function rowsForDataset(fileName, D) {
+    D = D || (typeof window !== 'undefined' ? window.SUGUO_DATA : null) || global.SUGUO_DATA || {};
+    // 销售明细里只存品类编码，需按主数据补出品类名称，否则「品类名称」会整列为空
+    var catName = {};
+    (D.categories || []).forEach(function (c) { catName[c.id] = c.name; });
+    if (fileName === 'dataset_category_sales.csv') {
+      return (D.sales || []).map(function (r) {
+        return {
+          '品类ID': r.cid, '品类名称': catName[r.cid] || '', '月份': r.month, '销量(件)': r.qty,
+          '销售额(元)': r.amt, '毛利额(元)': r.gp, '库存周转天数': r.turnoverDays,
+          '坪效(元/㎡/月)': r.spaceEff, '缺货次数': r.stockout, 'SKU数量': r.skuCount,
+        };
+      });
+    }
+    if (fileName === 'dataset_association_rules.csv') {
+      return (D.rulesAttachment || []).map(function (r) {
+        return {
+          '规则ID': r.id, '前项商品(A)': r.a, '后项商品(B)': r.b,
+          '支持度': r.support, '置信度': r.confidence, '提升度': r.lift,
+          '陈列建议': r.advice,
+        };
+      });
+    }
+    if (fileName === 'dataset_category_health.csv') {
+      return (D.healthAttachment || []).map(function (r) {
+        return {
+          '品类ID': r.cid, '品类名称': r.name, '综合评分': r.score,
+          '健康度等级': r.stars, '评级': r.grade,
+          '销量贡献(%)': r.qtyShare, '毛利贡献(%)': r.gpShare,
+          '周转天数': r.turnoverDays, '坪效得分': r.spaceScore,
+          '优化建议': r.advice, '预警灯': r.lamp,
+        };
+      });
+    }
+    if (fileName === 'dataset_demand_forecast.csv') {
+      var out = [];
+      (D.forecast || []).forEach(function (f) {
+        f.points.forEach(function (p) {
+          out.push({
+            '品类': f.cat, '周次': p.w, '日期': p.date,
+            '历史销量(件)': p.hist == null ? '' : p.hist,
+            '预测销量(件)': p.fc == null ? '' : p.fc,
+            '预测下界(件)': p.lo == null ? '' : p.lo,
+            '预测上界(件)': p.hi == null ? '' : p.hi,
+            '数据类型': p.type,
+          });
+        });
+      });
+      return out;
+    }
+    return null;   // 交易明细 22022 行，改由上传路径按抽样检查
+  }
+
   /* ==================== 导出 ==================== */
 
   var API = {
@@ -1707,6 +1842,7 @@ window.SUGUO_DATA = {"meta":{"platform":"苏果智选 Suguo AI Assortment Intell
     buildAssortmentPlan: buildAssortmentPlan,
     buildDashboard: buildDashboard,
     runQualityCheck: runQualityCheck,
+    rowsForDataset: rowsForDataset,
     trendLevelOf: trendLevelOf,
     QUALITY_CHECKERS: QUALITY_CHECKERS,
     computeTrend: computeTrend,
@@ -5879,32 +6015,10 @@ window.SUGUO_DATA = {"meta":{"platform":"苏果智选 Suguo AI Assortment Intell
     'dataset_category_health.csv': 'category_health',
   };
 
-  /** 从内置数据集抽取原始行（用于质量检查，只读） */
+  /** 从内置数据集抽取原始行（用于质量检查，只读）。
+   *  形状映射统一由 Algo.rowsForDataset 提供，避免「内部短键 vs CSV 表头」的口径分散在多处。 */
   function rowsOf(fileName) {
-    var D = global.SUGUO_DATA;
-    if (fileName === 'dataset_category_sales.csv') return D.salesRaw || D.sales.map(function (r) {
-      return {
-        '品类ID': r.cid, '品类名称': r.cat, '月份': r.month, '销量(件)': r.qty,
-        '销售额(元)': r.amt, '毛利额(元)': r.gp, '库存周转天数': r.turnoverDays,
-        '坪效(元/㎡/月)': r.spaceEff, '缺货次数': r.stockout, 'SKU数量': r.skuCount,
-      };
-    });
-    if (fileName === 'dataset_association_rules.csv') return D.rulesRaw || (D.rulesAttachment || []);
-    if (fileName === 'dataset_category_health.csv') return D.healthRaw || (D.healthAttachment || []);
-    if (fileName === 'dataset_demand_forecast.csv') {
-      var out = [];
-      (D.forecast || []).forEach(function (f) {
-        f.points.forEach(function (p) {
-          out.push({
-            '品类': f.cat, '周次': p.week, '日期': p.date,
-            '历史销量(件)': p.hist == null ? '' : p.hist,
-            '预测销量(件)': p.fc == null ? '' : p.fc, '类型': p.type,
-          });
-        });
-      });
-      return out;
-    }
-    return null;   // 交易明细 22022 行，走聚合抽样检查
+    return A.rowsForDataset(fileName, global.SUGUO_DATA);
   }
 
   function runQC(fileName) {
@@ -5913,7 +6027,8 @@ window.SUGUO_DATA = {"meta":{"platform":"苏果智选 Suguo AI Assortment Intell
     var rows = rowsOf(fileName);
     if (!rows || !rows.length) return global.App.toast('无法读取该数据集内容', 'err');
     var rep = A.runQualityCheck(type, rows, fileName);
-    if (!rep.ok) return global.App.toast(rep.reason || '检查失败', 'err');
+    // 拒答不是错误：缺必需字段属于「无法评估」，以警示语气提示即可，便于用户区分
+    if (!rep.ok) return global.App.toast(rep.reason || '当前数据不足以完成质量检查', 'warn');
     S().qualityReports = S().qualityReports.filter(function (r) { return r.fileName !== fileName; });
     S().qualityReports.unshift(rep);
     global.App.audit('执行数据质量检查', fileName, '综合得分 ' + rep.overall + '（' + rep.grade + '），发现 ' + rep.issues.length + ' 项问题');
@@ -8615,6 +8730,484 @@ window.SUGUO_DATA = {"meta":{"platform":"苏果智选 Suguo AI Assortment Intell
   global.AIRoute = route;
   global.AIAnswer = answer;
 })(window);
+
+
+/* ===== app-api.js ===== */
+/* ============================================================================
+ * 苏果智选 · 后台 API 适配层 (app-api.js)
+ * ----------------------------------------------------------------------------
+ * 职责：把单文件版的「内联数据集」切换为「FastAPI 后台数据集」。
+ *
+ * 架构约束（铁律 9）：本文件**不调用任何渲染函数**，只做三件事：
+ *   1. 替换数据层（window.SUGUO_DATA 的 sales / forecast）
+ *   2. 覆写数据访问器（App.getAssoc —— 交易量大，关联规则由后台算好取回）
+ *   3. 调用 App.invalidate() + App.refreshPage()，由后者统一调度重渲染
+ *
+ * 为什么不在后台重算健康度：
+ *   算法层是纯函数，前后端实现等价（已由 pytest 第 5 项逐项对照验证）。
+ *   因此数据从后台来、算法在客户端算，既拿到真实数据接入，
+ *   又保留了参数（权重）即时调整的交互体验。
+ *
+ * 降级策略：后台不可用时页面自动回退到内联数据，功能不受影响。
+ * ==========================================================================*/
+(function (global) {
+  'use strict';
+
+  var LS_KEY = 'wb_suguo_api_cfg';
+  var DEFAULT_BASE = 'http://127.0.0.1:8000';
+
+  var Api = {
+    connected: false,
+    baseUrl: DEFAULT_BASE,
+    username: '',
+    token: '',
+    lastSync: null,
+    lastError: null,
+    remoteAssoc: null,
+    parity: null,
+    _installed: false,
+    _orig: {},
+    _backup: null
+  };
+
+  /* ------------------------------ 配置读写 ------------------------------ */
+
+  function loadCfg() {
+    try {
+      return JSON.parse(global.localStorage.getItem(LS_KEY) || '{}') || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveCfg(c) {
+    try {
+      global.localStorage.setItem(LS_KEY, JSON.stringify(c));
+    } catch (e) { /* 隐私模式下 localStorage 可能不可写，忽略 */ }
+  }
+
+  function clearCfg() {
+    try {
+      global.localStorage.removeItem(LS_KEY);
+    } catch (e) { /* 同上 */ }
+  }
+
+  /* ------------------------------ HTTP 封装 ------------------------------ */
+
+  function request(path, opts) {
+    opts = opts || {};
+    if (typeof global.fetch !== 'function') {
+      return Promise.reject(new Error('当前运行环境不支持 fetch，无法连接后台。'));
+    }
+    var url = Api.baseUrl.replace(/\/+$/, '') + path;
+    var headers = { 'Content-Type': 'application/json' };
+    if (Api.token) headers.Authorization = 'Bearer ' + Api.token;
+
+    return global.fetch(url, {
+      method: opts.method || 'GET',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = null;
+        try { data = JSON.parse(text); } catch (e) { /* 非 JSON 响应 */ }
+        if (!res.ok) {
+          var msg = (data && (data.detail || data.message)) || ('HTTP ' + res.status);
+          var err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+          err.status = res.status;
+          throw err;
+        }
+        return data;
+      });
+    });
+  }
+
+  /* --------------------- 数据层切换（唯一改动数据的地方） --------------------- */
+
+  function backupOnce() {
+    if (Api._backup) return;
+    var D = global.SUGUO_DATA;
+    if (!D) return;
+    Api._backup = {
+      sales: D.sales,
+      forecast: D.forecast,
+      categories: D.categories
+    };
+  }
+
+  function applyDataset(payload) {
+    var D = global.SUGUO_DATA;
+    if (!D || !payload) return;
+
+    // 字段名从后端 snake_case 映射回前端算法层约定，数值不做任何加工
+    D.sales = (payload.sales || []).map(function (r) {
+      return {
+        cid: r.cid,
+        name: r.name,
+        month: r.month,
+        qty: r.qty,
+        amt: r.amt,
+        gp: r.gp,
+        turnoverDays: r.turnover_days,
+        spaceEff: r.space_eff,
+        stockout: r.stockout,
+        skuCount: r.sku_count
+      };
+    });
+
+    D.forecast = (payload.forecast || []).map(function (f) {
+      return {
+        cat: f.cat,
+        points: (f.points || []).map(function (p) {
+          return {
+            week: p.week, label: p.label, hist: p.hist, fc: p.fc,
+            lo: p.lo, hi: p.hi, type: p.type
+          };
+        })
+      };
+    });
+
+    if (payload.categories && payload.categories.length) {
+      D.categories = payload.categories.map(function (c) {
+        return { id: c.id, code: c.code, name: c.name, role: c.role };
+      });
+    }
+  }
+
+  function restoreDataset() {
+    var D = global.SUGUO_DATA;
+    if (!D || !Api._backup) return;
+    D.sales = Api._backup.sales;
+    D.forecast = Api._backup.forecast;
+    D.categories = Api._backup.categories;
+  }
+
+  function install() {
+    var App = global.App;
+    if (!App || Api._installed) return;
+    Api._orig.getAssoc = App.getAssoc;
+
+    // 关联规则依赖 22022 条交易明细，不适合下发到前端，
+    // 因此改由后台算好后取回；其余模块在客户端用等价算法重算。
+    App.getAssoc = function (force) {
+      if (Api.connected && Api.remoteAssoc && !force) return Api.remoteAssoc;
+      return Api._orig.getAssoc.apply(App, arguments);
+    };
+
+    Api._installed = true;
+  }
+
+  function uninstall() {
+    var App = global.App;
+    if (!App || !Api._installed) return;
+    App.getAssoc = Api._orig.getAssoc;
+    Api._installed = false;
+  }
+
+  function refreshUI() {
+    var App = global.App;
+    if (App && typeof App.invalidate === 'function') App.invalidate();
+    if (App && typeof App.refreshPage === 'function') App.refreshPage();
+    updateBadge();
+  }
+
+  /* ------------------------------ 状态角标 ------------------------------ */
+
+  function updateBadge() {
+    var badge = document.getElementById('syncBadge');
+    if (!badge) return;
+    var tx = badge.querySelector('.tx');
+    if (!tx) return;
+    if (Api.connected) {
+      tx.textContent = '后台已连接';
+      badge.setAttribute('title',
+        '数据来源：FastAPI 后台 ' + Api.baseUrl + '（登录账号 ' + Api.username + '）\n' +
+        '最近同步：' + (Api.lastSync || '—'));
+    } else {
+      tx.textContent = '本地存储';
+      badge.setAttribute('title', '当前使用内联数据集（离线模式）');
+    }
+  }
+
+  /* ------------------------------ 一致性对照 ------------------------------ */
+
+  function runParity(localHealth, remoteHealth) {
+    if (!localHealth || !localHealth.ok || !remoteHealth || !remoteHealth.ok) return null;
+    var remoteByName = {};
+    remoteHealth.items.forEach(function (i) { remoteByName[i.name] = i.score; });
+
+    var rows = [];
+    var maxDiff = 0;
+    localHealth.items.forEach(function (i) {
+      var remote = remoteByName[i.name];
+      if (remote === undefined) return;
+      var diff = Math.abs(i.score - remote);
+      if (diff > maxDiff) maxDiff = diff;
+      rows.push({ name: i.name, local: i.score, remote: remote, diff: Math.round(diff * 100) / 100 });
+    });
+    return { rows: rows, maxDiff: Math.round(maxDiff * 100) / 100 };
+  }
+
+  /* ------------------------------ 连接 / 断开 ------------------------------ */
+
+  function connect(baseUrl, username, password) {
+    Api.baseUrl = (baseUrl || DEFAULT_BASE).replace(/\/+$/, '');
+    Api.lastError = null;
+
+    // 一致性对照必须在切换数据层之前完成：用「原始内联数据」的本地结果
+    // 与「后台数据」的后台结果比对，才能证明两套实现等价。
+    var localHealth = null;
+    try {
+      if (global.Algo) localHealth = global.Algo.computeCategoryHealth({});
+    } catch (e) { /* 本地算法不可用时跳过对照 */ }
+
+    return request('/api/v1/auth/login', {
+      method: 'POST',
+      body: { username: username, password: password }
+    }).then(function (login) {
+      Api.token = login.access_token;
+      Api.username = (login.user && login.user.username) || username;
+
+      return Promise.all([
+        request('/api/v1/data/algo-dataset'),
+        request('/api/v1/analysis/apriori', {
+          method: 'POST',
+          body: {
+            min_support: 0.02, min_confidence: 0.5, min_lift: 1.5,
+            top_n: 30, aggregate_by: 'name'
+          }
+        }),
+        request('/api/v1/analysis/health', { method: 'POST', body: { months: 12 } })
+      ]);
+    }).then(function (res) {
+      var dataset = res[0], apriori = res[1], remoteHealth = res[2];
+
+      backupOnce();
+      install();
+      Api.remoteAssoc = apriori;
+      Api.parity = runParity(localHealth, remoteHealth);
+      applyDataset(dataset);
+
+      Api.connected = true;
+      Api.lastSync = new Date().toLocaleString('zh-CN', { hour12: false });
+      saveCfg({
+        baseUrl: Api.baseUrl, username: Api.username,
+        token: Api.token, savedAt: Api.lastSync
+      });
+
+      refreshUI();
+      return {
+        ok: true,
+        dataRows: (dataset.sales || []).length,
+        forecastGroups: (dataset.forecast || []).length,
+        rules: (apriori.rules || []).length,
+        parity: Api.parity
+      };
+    }).catch(function (err) {
+      Api.connected = false;
+      Api.token = '';
+      Api.lastError = err.message || String(err);
+      updateBadge();
+      throw err;
+    });
+  }
+
+  function disconnect() {
+    var backup = Api._backup;
+    Api.connected = false;
+    Api.token = '';
+    Api.remoteAssoc = null;
+    Api.parity = null;
+    Api.lastSync = null;
+    uninstall();
+    restoreDataset();
+    // restoreDataset 依赖 _backup，恢复后即可释放
+    Api._backup = backup;
+    clearCfg();
+    refreshUI();
+    return { ok: true };
+  }
+
+  /* -------------------------- 启动时自动重连（可选） -------------------------- */
+
+  function autoConnect() {
+    var cfg = loadCfg();
+    if (!cfg.baseUrl || !cfg.token) return;   // 从未连接过 → 保持离线模式
+    Api.baseUrl = cfg.baseUrl;
+    Api.username = cfg.username || '';
+    Api.token = cfg.token;
+
+    var localHealth = null;
+    try {
+      if (global.Algo) localHealth = global.Algo.computeCategoryHealth({});
+    } catch (e) { /* 忽略 */ }
+
+    Promise.all([
+      request('/api/v1/data/algo-dataset'),
+      request('/api/v1/analysis/apriori', {
+        method: 'POST',
+        body: { min_support: 0.02, min_confidence: 0.5, min_lift: 1.5, top_n: 30, aggregate_by: 'name' }
+      }),
+      request('/api/v1/analysis/health', { method: 'POST', body: { months: 12 } })
+    ]).then(function (res) {
+      backupOnce();
+      install();
+      Api.remoteAssoc = res[1];
+      Api.parity = runParity(localHealth, res[2]);
+      applyDataset(res[0]);
+      Api.connected = true;
+      Api.lastSync = new Date().toLocaleString('zh-CN', { hour12: false });
+      refreshUI();
+    }).catch(function () {
+      // 令牌过期或后台未启动：静默回退到离线模式，不打断用户
+      Api.connected = false;
+      Api.token = '';
+      updateBadge();
+    });
+  }
+
+  /* ------------------------------ 连接面板 ------------------------------ */
+
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function parityTable() {
+    if (!Api.parity || !Api.parity.rows.length) {
+      return '<p class="api-note">未生成一致性对照（本地算法不可用或后台未返回健康度结果）。</p>';
+    }
+    var rows = Api.parity.rows.map(function (r) {
+      return '<tr><td>' + esc(r.name) + '</td>' +
+        '<td class="num">' + r.local + '</td>' +
+        '<td class="num">' + r.remote + '</td>' +
+        '<td class="num">' + r.diff.toFixed(2) + '</td></tr>';
+    }).join('');
+    var verdict = Api.parity.maxDiff < 0.5
+      ? '<span class="api-ok">两套独立实现结果一致（最大偏差 ' + Api.parity.maxDiff + ' 分）</span>'
+      : '<span class="api-warn">存在偏差，最大 ' + Api.parity.maxDiff + ' 分，请核对算法参数</span>';
+    return '<table class="api-table"><thead><tr>' +
+      '<th>品类</th><th>本地（内联数据）</th><th>后台（接口数据）</th><th>偏差</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table>' + verdict;
+  }
+
+  function panelHtml() {
+    var status = Api.connected
+      ? '<div class="api-status ok">已连接 · ' + esc(Api.baseUrl) + ' · 账号 ' + esc(Api.username) +
+        ' · 同步于 ' + esc(Api.lastSync) + '</div>'
+      : (Api.lastError
+        ? '<div class="api-status err">连接失败：' + esc(Api.lastError) + '</div>'
+        : '<div class="api-status">当前为离线模式，使用内联数据集。</div>');
+
+    return '' +
+      '<div class="api-title">后台服务连接（FastAPI）</div>' +
+      status +
+      '<div class="api-form">' +
+      '<label>服务地址<input id="apiBase" type="text" value="' + esc(Api.baseUrl) + '" placeholder="http://127.0.0.1:8000"></label>' +
+      '<label>账号<input id="apiUser" type="text" value="' + esc(Api.username || 'admin') + '"></label>' +
+      '<label>密码<input id="apiPass" type="password" value="" placeholder="演示账号密码 123456"></label>' +
+      '</div>' +
+      '<div class="api-actions">' +
+      '<button class="api-btn primary" id="apiConnect">连接后台</button>' +
+      '<button class="api-btn" id="apiDisconnect"' + (Api.connected ? '' : ' disabled') + '>断开并回到离线</button>' +
+      '<button class="api-btn ghost" id="apiClose">关闭</button>' +
+      '</div>' +
+      '<div class="api-section"><div class="api-h">前后端算法一致性对照</div>' + parityTable() + '</div>' +
+      '<p class="api-note">连接后：品类销售与需求预测数据来自后台接口，健康度、比较、趋势在客户端用等价算法实时重算；' +
+      '关联规则因依赖 2.2 万条交易明细，由后台计算后取回。后台不可用时自动回退到内联数据集。</p>';
+  }
+
+  var panelEl = null;
+
+  function closePanel() {
+    if (panelEl && panelEl.parentNode) panelEl.parentNode.removeChild(panelEl);
+    panelEl = null;
+  }
+
+  function bindPanel(host) {
+    var btnC = host.querySelector('#apiConnect');
+    var btnD = host.querySelector('#apiDisconnect');
+    var btnX = host.querySelector('#apiClose');
+
+    if (btnC) btnC.onclick = function () {
+      var base = (host.querySelector('#apiBase').value || '').trim();
+      var user = (host.querySelector('#apiUser').value || '').trim();
+      var pass = host.querySelector('#apiPass').value || '';
+      if (!user || !pass) {
+        host.querySelector('.api-status').className = 'api-status err';
+        host.querySelector('.api-status').textContent = '请填写账号与密码。';
+        return;
+      }
+      btnC.disabled = true;
+      btnC.textContent = '连接中…';
+      connect(base, user, pass).then(function (r) {
+        renderPanel();
+        if (global.App && global.App.toast) {
+          global.App.toast('已连接后台，数据已切换（销售 ' + r.dataRows + ' 行 / 规则 ' + r.rules + ' 条）', 'ok');
+        }
+      }).catch(function () {
+        renderPanel();
+      });
+    };
+
+    if (btnD) btnD.onclick = function () {
+      disconnect();
+      renderPanel();
+      if (global.App && global.App.toast) global.App.toast('已断开后台，回到离线模式', 'ok');
+    };
+
+    if (btnX) btnX.onclick = closePanel;
+  }
+
+  function renderPanel() {
+    closePanel();
+    if (!document.body) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'api-overlay';
+    var box = document.createElement('div');
+    box.className = 'api-panel';
+    box.innerHTML = panelHtml();
+    overlay.appendChild(box);
+    overlay.onclick = function (e) { if (e.target === overlay) closePanel(); };
+    document.body.appendChild(overlay);
+    panelEl = overlay;
+    bindPanel(box);
+    var first = box.querySelector('#apiPass');
+    if (first) { try { first.focus(); } catch (e) { /* 忽略 */ } }
+  }
+
+  /* ------------------------------ 对外接口 ------------------------------ */
+
+  Api.connect = connect;
+  Api.disconnect = disconnect;
+  Api.autoConnect = autoConnect;
+  Api.openPanel = renderPanel;
+  Api.closePanel = closePanel;
+  Api.status = function () {
+    return {
+      connected: Api.connected, baseUrl: Api.baseUrl, username: Api.username,
+      lastSync: Api.lastSync, error: Api.lastError, parity: Api.parity
+    };
+  };
+
+  global.SuguoApi = Api;
+
+  /* ------------------------------ 初始化 ------------------------------ */
+
+  function init() {
+    var btn = document.getElementById('topApi');
+    if (btn) btn.onclick = renderPanel;
+    updateBadge();
+    autoConnect();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})(typeof window !== 'undefined' ? window : this);
 
 </script>
 <script>App.boot();</script>

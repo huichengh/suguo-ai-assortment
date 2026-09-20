@@ -807,32 +807,10 @@
     'dataset_category_health.csv': 'category_health',
   };
 
-  /** 从内置数据集抽取原始行（用于质量检查，只读） */
+  /** 从内置数据集抽取原始行（用于质量检查，只读）。
+   *  形状映射统一由 Algo.rowsForDataset 提供，避免「内部短键 vs CSV 表头」的口径分散在多处。 */
   function rowsOf(fileName) {
-    var D = global.SUGUO_DATA;
-    if (fileName === 'dataset_category_sales.csv') return D.salesRaw || D.sales.map(function (r) {
-      return {
-        '品类ID': r.cid, '品类名称': r.cat, '月份': r.month, '销量(件)': r.qty,
-        '销售额(元)': r.amt, '毛利额(元)': r.gp, '库存周转天数': r.turnoverDays,
-        '坪效(元/㎡/月)': r.spaceEff, '缺货次数': r.stockout, 'SKU数量': r.skuCount,
-      };
-    });
-    if (fileName === 'dataset_association_rules.csv') return D.rulesRaw || (D.rulesAttachment || []);
-    if (fileName === 'dataset_category_health.csv') return D.healthRaw || (D.healthAttachment || []);
-    if (fileName === 'dataset_demand_forecast.csv') {
-      var out = [];
-      (D.forecast || []).forEach(function (f) {
-        f.points.forEach(function (p) {
-          out.push({
-            '品类': f.cat, '周次': p.week, '日期': p.date,
-            '历史销量(件)': p.hist == null ? '' : p.hist,
-            '预测销量(件)': p.fc == null ? '' : p.fc, '类型': p.type,
-          });
-        });
-      });
-      return out;
-    }
-    return null;   // 交易明细 22022 行，走聚合抽样检查
+    return A.rowsForDataset(fileName, global.SUGUO_DATA);
   }
 
   function runQC(fileName) {
@@ -841,7 +819,8 @@
     var rows = rowsOf(fileName);
     if (!rows || !rows.length) return global.App.toast('无法读取该数据集内容', 'err');
     var rep = A.runQualityCheck(type, rows, fileName);
-    if (!rep.ok) return global.App.toast(rep.reason || '检查失败', 'err');
+    // 拒答不是错误：缺必需字段属于「无法评估」，以警示语气提示即可，便于用户区分
+    if (!rep.ok) return global.App.toast(rep.reason || '当前数据不足以完成质量检查', 'warn');
     S().qualityReports = S().qualityReports.filter(function (r) { return r.fileName !== fileName; });
     S().qualityReports.unshift(rep);
     global.App.audit('执行数据质量检查', fileName, '综合得分 ' + rep.overall + '（' + rep.grade + '），发现 ' + rep.issues.length + ' 项问题');
