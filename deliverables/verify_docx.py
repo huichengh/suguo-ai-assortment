@@ -94,6 +94,45 @@ def check(path, label, expect):
             FAIL.append(f"{label}: 关键词「{kw}」未出现在 docx 中")
     print(f"正文字符总数（含表格）≈ {len(allt)}")
 
+    # 8. 区段禁用词：第三章须为纯理论章，不得混入平台实现内容
+    if expect.get("forbidden_ch3"):
+        seg = _section_text(d, "第三章", "第四章")
+        print(f"  第三章区段字符数 = {len(seg)}")
+        hits = [p for p in expect["forbidden_ch3"] if p in seg]
+        for p in hits:
+            FAIL.append(f"{label}: 第三章出现实现内容「{p}」（第三章应为纯理论章）")
+            print(f"    ✗ 第三章禁词命中：「{p}」")
+        print(f"    第三章禁词扫描：{len(hits)} 处命中 / 共 {len(expect['forbidden_ch3'])} 项")
+
+
+def _section_text(doc, start_kw, end_kw):
+    """取 docx 中从含 start_kw 的一级标题到含 end_kw 的一级标题之间的全部文字
+    （段落与表格单元格合并，按 body 顺序），用于区段级禁词扫描。"""
+    from docx.oxml.ns import qn
+    buf, inside, done = [], False, False
+    for ch in doc.element.body.iterchildren():
+        if ch.tag == qn("w:p"):
+            ppr = ch.find(qn("w:pPr"))
+            st = ""
+            if ppr is not None:
+                ps = ppr.find(qn("w:pStyle"))
+                if ps is not None:
+                    st = ps.get(qn("w:val")) or ""
+            txt = "".join(n.text or "" for n in ch.iter(qn("w:t")))
+            if st.replace(" ", "") == "Heading1":
+                if not inside and start_kw in txt:
+                    inside = True
+                    continue
+                if inside and end_kw in txt:
+                    done = True
+                    break
+            if inside:
+                buf.append(txt)
+        elif ch.tag == qn("w:tbl") and inside and not done:
+            for t in ch.iter(qn("w:t")):
+                buf.append(t.text or "")
+    return "\n".join(buf)
+
 
 # 主报告
 check(
@@ -101,11 +140,11 @@ check(
     "苏果智选-参赛报告-第三至六章及附录C.docx",
     "主报告",
     {
-        # 2026-09-24 第二次校准：3.2 核心理论详述节的 4 张表改写为文字叙述，
-        # 表数 62→58、段数 377→390、Heading 96（h4 已清零故不变）。
-        "min_tables": 56,
-        "min_par": 383,
-        "min_heading": 94,
+        # 2026-09-24 第三次校准：第三章剥离为纯理论章（实现内容并入第四章
+        # 4.2.5 三级审批表与 4.2.6 痛点覆盖表），表数 58→60、段数 390→398、Heading 96→97。
+        "min_tables": 58,
+        "min_par": 391,
+        "min_heading": 95,
         "expect_hyperlink": 30,
         "keywords": [
             "第三章", "第四章", "第五章", "第六章", "附录 C",
@@ -124,9 +163,20 @@ check(
             "8 项经营指标",            # 原“8 项经营 KPI”，且已列出 8 项明细
             # 3.2 核心理论详述“表格改文字”后的独有表述（2026-09-24 第二轮）
             "影响可逆程度",           # 3.2.7 三级权限模型的划分依据（原表格改为行文）
-            "第一层是字段级机制",      # 3.2.6 数据不足拒答的三层机制（原表格改为行文）
-            "第二层是粒度级机制",
-            "第三层是决策级机制",
+            "字段级判定",             # 3.2.6 数据不足拒答的三层判定（原“三层机制”改题）
+            "粒度级判定",
+            "决策级判定",
+            # 第三章剥离为纯理论章、实现内容并入第四章后新增的锚点（第三轮）
+            "本章只讨论理论层面",      # 第三章开篇的定位声明
+            "可介入的分析环节",        # 3.3 表新列（原“平台功能模块与输出”列移出）
+            "数据前提与适用边界",      # 3.3 表新列（原“实现状态”列移出）
+            "痛点覆盖与实现状态",      # 第四章 4.2.6 新增节，承接原 3.3 表的实现两列
+        ],
+        # 第三章须为纯理论章：下列实现类字串不得出现在第三章区段内
+        "forbidden_ch3": [
+            "/api/", "model_settings", "pytest", "is_reference",
+            "/category-health", "/association", "/forecast", "/store-profile",
+            "POST ", "GET ", "PATCH ", "数据来源：",
         ],
     },
 )
