@@ -94,20 +94,21 @@ def check(path, label, expect):
             FAIL.append(f"{label}: 关键词「{kw}」未出现在 docx 中")
     print(f"正文字符总数（含表格）≈ {len(allt)}")
 
-    # 8. 区段禁用词：第三章须为纯理论章，不得混入平台实现内容
+    # 8. 区段禁用词：第三章 3.1／3.2 为纯理论部分，不得混入平台实现内容
+    #    （3.3「痛点到AI解法的映射」按设计保留平台内容，故扫描止于 3.3 标题）
     if expect.get("forbidden_ch3"):
-        seg = _section_text(d, "第三章", "第四章")
-        print(f"  第三章区段字符数 = {len(seg)}")
+        seg = _section_text(d, "第三章", "3.3", end_level=2)
+        print(f"  第三章 3.1—3.2 区段字符数 = {len(seg)}")
         hits = [p for p in expect["forbidden_ch3"] if p in seg]
         for p in hits:
-            FAIL.append(f"{label}: 第三章出现实现内容「{p}」（第三章应为纯理论章）")
-            print(f"    ✗ 第三章禁词命中：「{p}」")
-        print(f"    第三章禁词扫描：{len(hits)} 处命中 / 共 {len(expect['forbidden_ch3'])} 项")
+            FAIL.append(f"{label}: 第三章 3.1／3.2 出现实现内容「{p}」（该部分应为纯理论）")
+            print(f"    ✗ 禁词命中：「{p}」")
+        print(f"    3.1／3.2 禁词扫描：{len(hits)} 处命中 / 共 {len(expect['forbidden_ch3'])} 项")
 
 
-def _section_text(doc, start_kw, end_kw):
-    """取 docx 中从含 start_kw 的一级标题到含 end_kw 的一级标题之间的全部文字
-    （段落与表格单元格合并，按 body 顺序），用于区段级禁词扫描。"""
+def _section_text(doc, start_kw, end_kw, end_level=1):
+    """取 docx 中从含 start_kw 的一级标题，到含 end_kw 的第 end_level 级标题之间的
+    全部文字（段落与表格单元格合并，按 body 顺序），用于区段级禁词扫描。"""
     from docx.oxml.ns import qn
     buf, inside, done = [], False, False
     for ch in doc.element.body.iterchildren():
@@ -117,15 +118,14 @@ def _section_text(doc, start_kw, end_kw):
             if ppr is not None:
                 ps = ppr.find(qn("w:pStyle"))
                 if ps is not None:
-                    st = ps.get(qn("w:val")) or ""
+                    st = (ps.get(qn("w:val")) or "").replace(" ", "")
             txt = "".join(n.text or "" for n in ch.iter(qn("w:t")))
-            if st.replace(" ", "") == "Heading1":
-                if not inside and start_kw in txt:
-                    inside = True
-                    continue
-                if inside and end_kw in txt:
-                    done = True
-                    break
+            if st == "Heading1" and not inside and start_kw in txt:
+                inside = True
+                continue
+            if inside and st == f"Heading{end_level}" and end_kw in txt:
+                done = True
+                break
             if inside:
                 buf.append(txt)
         elif ch.tag == qn("w:tbl") and inside and not done:
@@ -140,8 +140,9 @@ check(
     "苏果智选-参赛报告-第三至六章及附录C.docx",
     "主报告",
     {
-        # 2026-09-24 第三次校准：第三章剥离为纯理论章（实现内容并入第四章
-        # 4.2.5 三级审批表与 4.2.6 痛点覆盖表），表数 58→60、段数 390→398、Heading 96→97。
+        # 2026-09-24 第四次校准：3.3 恢复平台映射表并新增“支撑类模块”表，
+        # 第四章移除重复的 4.2.6。表数仍为 60（ch3 3 张 / ch4 20 张）、段数 398、
+        # Heading 97→96。禁词扫描范围收窄为 第三章→3.3（3.3 有意保留平台内容）。
         "min_tables": 58,
         "min_par": 391,
         "min_heading": 95,
@@ -166,13 +167,13 @@ check(
             "字段级判定",             # 3.2.6 数据不足拒答的三层判定（原“三层机制”改题）
             "粒度级判定",
             "决策级判定",
-            # 第三章剥离为纯理论章、实现内容并入第四章后新增的锚点（第三轮）
-            "本章只讨论理论层面",      # 第三章开篇的定位声明
-            "可介入的分析环节",        # 3.3 表新列（原“平台功能模块与输出”列移出）
-            "数据前提与适用边界",      # 3.3 表新列（原“实现状态”列移出）
-            "痛点覆盖与实现状态",      # 第四章 4.2.6 新增节，承接原 3.3 表的实现两列
+            # 第三章分工调整后的锚点（第四轮：3.3 恢复平台映射并补全）
+            "本章只讨论理论层面",      # 第三章开篇的定位声明（3.1／3.2 纯理论）
+            "平台功能模块与输出",      # 3.3 映射表列头（恢复）
+            "支撑模块（路由）",        # 3.3 新增的支撑类模块表表头
         ],
-        # 第三章须为纯理论章：下列实现类字串不得出现在第三章区段内
+        # 第三章 3.1／3.2 须为纯理论：下列实现类字串不得出现在该区段内
+        # （3.3 节按设计保留平台内容，不在此扫描范围内）
         "forbidden_ch3": [
             "/api/", "model_settings", "pytest", "is_reference",
             "/category-health", "/association", "/forecast", "/store-profile",
