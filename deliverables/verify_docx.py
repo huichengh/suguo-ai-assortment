@@ -105,6 +105,63 @@ def check(path, label, expect):
             print(f"    ✗ 禁词命中：「{p}」")
         print(f"    3.1／3.2 禁词扫描：{len(hits)} 处命中 / 共 {len(expect['forbidden_ch3'])} 项")
 
+    # 9. 区段禁用词：全正文（第三章 至 附录 C 之前）不得出现技术标识
+    #    （2026-09-24 去代码化：表名／字段名／接口路径／测试名全部改为中文业务表述；
+    #      附录 C 是平台配置方案，按设计保留工具名与接口路径，不在此范围内）
+    if expect.get("forbidden_body"):
+        seg = _section_text(d, "第三章", "附录", end_level=1)
+        print(f"  正文（第三章至附录C前）字符数 = {len(seg)}")
+        hits = [p for p in expect["forbidden_body"] if p in seg]
+        for p in hits:
+            FAIL.append(f"{label}: 正文出现技术标识「{p}」（应已改写为中文业务表述）")
+            print(f"    ✗ 正文技术标识命中：「{p}」")
+        print(f"    正文技术标识扫描：{len(hits)} 处命中 / 共 {len(expect['forbidden_body'])} 项")
+
+    # 10. 正向断言：正文不得残留等宽代码样式
+    #     HTML 的 <code> 在 docx 中渲染为 Courier 等宽字体；正文改写后应为 0，
+    #     附录 C 保留代码，故扫描区间止于附录 C 标题之前。
+    if expect.get("no_mono_in_body"):
+        fonts = _range_fonts(d, "第三章", "附录")
+        mono = sorted(f for f in fonts if "Courier" in f or "Consolas" in f or "Mono" in f)
+        print(f"  正文用到的西文字体 = {sorted(fonts)}")
+        if mono:
+            FAIL.append(f"{label}: 正文仍残留等宽代码字体 {mono}")
+            print(f"    ✗ 等宽代码字体：「{mono}」")
+        else:
+            print("    ✓ 正文无等宽代码字体")
+
+
+def _range_fonts(doc, start_kw, end_kw):
+    """取 docx 中从含 start_kw 的一级标题到含 end_kw 的一级标题之间的
+    所有 run 级西文字体名集合，用于检测正文是否残留 <code> 的等宽字体。"""
+    fonts, inside = set(), False
+    for ch in doc.element.body.iterchildren():
+        if ch.tag == qn("w:p"):
+            ppr = ch.find(qn("w:pPr"))
+            st = ""
+            if ppr is not None:
+                ps = ppr.find(qn("w:pStyle"))
+                if ps is not None:
+                    st = (ps.get(qn("w:val")) or "").replace(" ", "")
+            txt = "".join(n.text or "" for n in ch.iter(qn("w:t")))
+            if st == "Heading1":
+                if not inside and start_kw in txt:
+                    inside = True
+                    continue
+                if inside and end_kw in txt:
+                    break
+            if inside:
+                for rf in ch.iter(qn("w:rFonts")):
+                    a = rf.get(qn("w:ascii")) or ""
+                    if a:
+                        fonts.add(a)
+        elif ch.tag == qn("w:tbl") and inside:
+            for rf in ch.iter(qn("w:rFonts")):
+                a = rf.get(qn("w:ascii")) or ""
+                if a:
+                    fonts.add(a)
+    return fonts
+
 
 def _section_text(doc, start_kw, end_kw, end_level=1):
     """取 docx 中从含 start_kw 的一级标题，到含 end_kw 的第 end_level 级标题之间的
@@ -140,11 +197,12 @@ check(
     "苏果智选-参赛报告-第三至六章及附录C.docx",
     "主报告",
     {
-        # 2026-09-24 第四次校准：3.3 恢复平台映射表并新增“支撑类模块”表，
-        # 第四章移除重复的 4.2.6。表数仍为 60（ch3 3 张 / ch4 20 张）、段数 398、
-        # Heading 97→96。禁词扫描范围收窄为 第三章→3.3（3.3 有意保留平台内容）。
-        "min_tables": 58,
-        "min_par": 391,
+        # 2026-09-24 第五轮（去代码化）：正文 299 处 <code>（ch3 17 / ch4 174 /
+        # ch5 87 / ch6 21）全部改写为中文业务表述，附录 C 的 140 处按设计保留。
+        # 结构量不变：3 节 / 398 段 / 60 表 / 96 Heading / 30 超链接。
+        # 新增 forbidden_body（全正文技术标识）与 no_mono_in_body（正文等宽字体）两项断言。
+        "min_tables": 60,
+        "min_par": 395,
         "min_heading": 95,
         "expect_hyperlink": 30,
         "keywords": [
@@ -179,6 +237,18 @@ check(
             "/category-health", "/association", "/forecast", "/store-profile",
             "POST ", "GET ", "PATCH ", "数据来源：",
         ],
+        # 全正文不得残留技术标识（附录 C 不在此范围）
+        # 注意：技术栈名（FastAPI／Pydantic／pytest／React／SKU 等）属“技术选型”
+        # 的必要内容，须保留，故不列入本表。
+        "forbidden_body": [
+            "category_sales", "transaction_items", "demand_history", "demand_forecasts",
+            "association_rules", "category_health_results", "approval_requests",
+            "model_settings", "is_reference", "has_sku_data", "UnboundLocalError",
+            "test_", "DataFrame",
+            "POST /api", "GET /api", "PATCH /api",
+        ],
+        # 正文不得残留等宽代码字体（附录 C 保留代码，不在扫描区间）
+        "no_mono_in_body": True,
     },
 )
 
