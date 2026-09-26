@@ -129,6 +129,14 @@ def check(path, label, expect):
             print(f"    ✗ 等宽代码字体：「{mono}」")
         else:
             print("    ✓ 正文无等宽代码字体")
+        # 反向验证：附录 C 按设计保留 <code>，应仍检出等宽字体。
+        # 若此处为空，说明等宽检测本身失效，正文的「无等宽」结论不可信。
+        app_fonts = _range_fonts(d, "附录", None)
+        app_mono = sorted(f for f in app_fonts if "Courier" in f or "Consolas" in f or "Mono" in f)
+        print(f"  反向验证：附录 C 西文字体 = {sorted(app_fonts)} → 等宽 {app_mono}")
+        if not app_mono:
+            FAIL.append(f"{label}: 反向验证失败——附录 C 未检出等宽字体，等宽检测可能失效")
+            print("    ✗ 附录 C 无等宽字体，等宽检测结论不可信")
 
 
 def _range_fonts(doc, start_kw, end_kw):
@@ -148,7 +156,7 @@ def _range_fonts(doc, start_kw, end_kw):
                 if not inside and start_kw in txt:
                     inside = True
                     continue
-                if inside and end_kw in txt:
+                if inside and end_kw and end_kw in txt:
                     break
             if inside:
                 for rf in ch.iter(qn("w:rFonts")):
@@ -201,19 +209,21 @@ check(
         # ch5 87 / ch6 21）全部改写为中文业务表述，附录 C 的 140 处按设计保留。
         # 结构量不变：3 节 / 398 段 / 60 表 / 96 Heading / 30 超链接。
         # 新增 forbidden_body（全正文技术标识）与 no_mono_in_body（正文等宽字体）两项断言。
-        "min_tables": 60,
-        "min_par": 395,
-        "min_heading": 95,
-        "expect_hyperlink": 30,
+        "min_tables": 48,
+        "min_par": 355,
+        "min_heading": 80,
+        "expect_hyperlink": 26,
         "keywords": [
             "第三章", "第四章", "第五章", "第六章", "附录 C",
             "双轨", "拒答", "Apriori", "健康度",
-            "五条硬性约束", "系统提示词", "工作流节点", "知识库",
+            "系统提示词", "工作流节点", "知识库", "五个原则段",
             "当前数据不足以支持该结论",
             "基于公开行业数据构造的模拟演示数据",
-            # 附录 C 按新工程口径对齐后的关键锚点（防止回退到旧原型口径）
-            "11 个工具", "/api/dashboard/summary", "需补齐统一鉴权中间件",
-            "20 张数据表", "同口径 Min-Max",
+            # 附录 C 精简后的关键锚点（2026-09-24 第六轮：只保留已实现内容）
+            "AI 选品助手的智能体设计", "实现状态与两侧分工",
+            "10 个工具函数", "六段式回答模板", "禁止清单",
+            "AstronClaw", "spark-X2-Agent",
+            "20 张数据表",
             # 场景分析报告体裁规范化后的锚点（2026-09-24 改写轮新增）
             "数据性质与来源说明",      # 正文前置的数据说明节
             "平台实测", "附件参考", "行业公开",   # 全文统一的三档数据标注口径

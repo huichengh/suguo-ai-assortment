@@ -35,7 +35,7 @@ const c3body = bodyM[1].trim();
 /* 封面补一行附录 C */
 cover = cover.replace(
   /(<p class="cover-line">第六章[^<]*<\/p>)/,
-  '$1\n  <p class="cover-line">附录 C　讯飞星辰 Agent 平台配置方案</p>'
+  '$1\n  <p class="cover-line">附录 C　AI 选品助手的智能体设计</p>'
 );
 if (!/附录 C/.test(cover)) throw new Error('封面补写附录 C 失败');
 
